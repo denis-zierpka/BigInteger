@@ -49,6 +49,24 @@ public:
 
     BigInteger(const int element): BigInteger(std::to_string(element)) {}
 
+    std::string toString() {
+        std::string new_object;
+        if (negative())
+            new_object += '-';
+        int max_size = static_cast<int>(body_.size()) - 1;
+        for (int i = max_size; i >= 0; --i) {
+            if (i != max_size) {
+                int base_number = BigInteger::BASE;
+                while (body_[i] < base_number / 10) {
+                    new_object += '0';
+                    base_number /= 10;
+                }
+            }
+            new_object += std::to_string(body_[i]);
+        }
+        return new_object;
+    }
+
     bool negative() const {
         return negative_;
     }
@@ -60,6 +78,13 @@ public:
 
     int size() const {
         return static_cast<int>(body_.size());
+    }
+
+    BigInteger operator-() const {
+        BigInteger new_object = *this;
+        new_object.negative_ = !new_object.negative_;
+        new_object.normalize();
+        return new_object;
     }
 
     void normalize() {
@@ -173,23 +198,25 @@ public:
         normalize();
     }
 
-    void operator+= (const BigInteger& other) {
+    BigInteger& operator+= (const BigInteger& other) {
         if ((negative() && other.negative()) || (!negative() && !other.negative())) {
             plus_if_same_sign(other);
         } else {
             minus_if_same_sign(other);
         }
+        return *this;
     }
 
-    void operator-= (const BigInteger& other) {
+    BigInteger& operator-= (const BigInteger& other) {
         if ((!negative() && !other.negative()) || (negative() && other.negative())) {
             minus_if_same_sign(other);
         } else {
             plus_if_same_sign(other);
         }
+        return *this;
     }
 
-    void operator*= (const BigInteger& other) {   //TODO (nˆ2 - unoptimized)
+    BigInteger& operator*= (const BigInteger& other) {   //TODO (nˆ2 - unoptimized)
         int new_size = size() + other.size() + 2;
         BigInteger new_body = BigInteger();
         new_body.body_.resize(new_size);
@@ -211,106 +238,8 @@ public:
         }
         new_body.negative_ = (negative_ != other.negative_);
         swap(new_body);
+        return *this;
     }
-
-    /*BigInteger div_first(BigInteger& other) {
-        BigInteger return_val = BigInteger();
-        return_val.body_.clear();
-        for (int i = 0; i < other.size() / 2; ++i)
-            return_val.body_.push_back(other.body_[i]);
-        return return_val;
-    }
-
-    BigInteger div_second(BigInteger& other) {
-        BigInteger return_val = BigInteger();
-        return_val.body_.clear();
-        for (int i = other.size() / 2; i < other.size(); ++i)
-            return_val.body_.push_back(other.body_[i]);
-        return return_val;
-    }
-
-    BigInteger add_right(BigInteger& other) {
-        BigInteger return_val = BigInteger();
-        return_val.body_.clear();
-        for (int i = 0; i < size(); ++i) {
-            return_val.body_.push_back(body_[i]);
-        }
-        for (int i = 0; i < other.size(); ++i) {
-            return_val.body_.push_back(other.body_[i]);
-        }
-        return return_val;
-    }
-
-    BigInteger mult(BigInteger a, BigInteger other) {
-        BigInteger ans = BigInteger();
-        if (a.size() == 0)
-            return ans;
-        if (a.size() == 1) {
-            a *= other;
-            return a;
-        }
-        if (other.size() == 1) {
-            a *= other;
-            return a;
-        }
-        BigInteger res = BigInteger();
-        res.body_.clear();
-        res.body_.resize(a.size() + other.size() + 2);
-        BigInteger left_this = div_first(a);
-        BigInteger right_this = div_second(a);
-        BigInteger left_other = div_first(other);
-        BigInteger right_other = div_second(other);
-        std::cout << left_this << ' ' << right_this << ' ' << left_other << ' ' << right_other << std::endl;
-
-        BigInteger a1 = mult(left_this, left_other);
-        std::cout << "fi " << a1 << std::endl;
-        for (int i = 0; i < a1.size(); ++i) {
-            res.body_[i] += a1.body_[i];
-            if (res.body_[i] > 9) {
-                res.body_[i] -= 10;
-                res.body_[i + 1]++;
-            }
-        }
-        a1 = mult(left_this, right_other);
-        std::cout << "se " << a1 << std::endl;
-        for (int i = left_other.size(); i < left_other.size() + a1.size(); ++i) {
-            res.body_[i] += a1.body_[i - left_other.size()];
-            if (res.body_[i] > 9) {
-                res.body_[i] -= 10;
-                res.body_[i + 1]++;
-            }
-        }
-        a1 = mult(right_this, left_other);
-        std::cout << "th " << a1 << std::endl;
-        for (int i = left_this.size(); i < left_this.size() + a1.size(); ++i) {
-            res.body_[i] += a1.body_[i - left_this.size()];
-            if (res.body_[i] > 9) {
-                res.body_[i] -= 10;
-                res.body_[i + 1]++;
-            }
-        }
-        a1 = mult(right_this, right_other);
-        std::cout << "fo " << a1 << std::endl;
-        for (int i = left_this.size() + left_other.size(); i < left_this.size() + left_other.size() + a1.size(); ++i) {
-            res.body_[i] += a1.body_[i - (left_this.size() + left_other.size())];
-            if (res.body_[i] > 9) {
-                res.body_[i] -= 10;
-                res.body_[i + 1]++;
-            }
-        }
-        for (int i = 0; i < res.size() - 1; ++i) {
-            while (res.body_[i] > 9) {
-                res.body_[i] -= 10;
-                res.body_[i + 1]++;
-            }
-        }
-        while (res.size() > 1 && res.body_[res.size() - 1] == 0)
-            res.body_.pop_back();
-
-        std::cout << res << std::endl;
-        res.negative_ = (a.negative_ != other.negative_);
-        return res;
-    }*/
 
     void division(const BigInteger& other, BigInteger& a, BigInteger& new_body) {
         if (other == 1 || other == -1) {
@@ -340,25 +269,57 @@ public:
         a.negative_ = negative_;
     }
 
-    void operator/= (const BigInteger& other) {
+    BigInteger& operator/= (const BigInteger& other) {
         BigInteger a = BigInteger();
         BigInteger new_body = BigInteger();
         division(other, a, new_body);
         *this = new_body;
         normalize();
+        return *this;
     }
 
-    void operator%= (const BigInteger& other) {
+    BigInteger& operator%= (const BigInteger& other) {
         BigInteger a = BigInteger();
         BigInteger new_body = BigInteger();
         division(other, a, new_body);
         *this = a;
         normalize();
+        return *this;
     }
 };
 
-const int BigInteger::NUMBER_COUNT = 1;
-const int BigInteger::BASE = 10;
+const int BigInteger::NUMBER_COUNT = 4;
+const int BigInteger::BASE = 10000;
+
+BigInteger operator+ (const BigInteger& object, const BigInteger& other) {
+    BigInteger new_object = object;
+    new_object += other;
+    return new_object;
+}
+
+BigInteger operator- (const BigInteger& object, const BigInteger& other) {
+    BigInteger new_object = object;
+    new_object -= other;
+    return new_object;
+}
+
+BigInteger operator* (const BigInteger& object, const BigInteger& other) {
+    BigInteger new_object = object;
+    new_object *= other;
+    return new_object;
+}
+
+BigInteger operator/ (const BigInteger& object, const BigInteger& other) {
+    BigInteger new_object = object;
+    new_object /= other;
+    return new_object;
+}
+
+BigInteger operator% (const BigInteger& object, const BigInteger& other) {
+    BigInteger new_object = object;
+    new_object %= other;
+    return new_object;
+}
 
 std::istream& operator >> (std::istream& cin, BigInteger& input) {
     std::string new_input;
