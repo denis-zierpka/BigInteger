@@ -10,7 +10,7 @@ std::ostream& operator << (std::ostream& cout, BigInteger& output);
 
 
 class BigInteger {
-    friend std::ostream& operator << (std::ostream& cout, BigInteger& output);
+    friend std::ostream& operator << (std::ostream& cout, const BigInteger& output);
 
 public:
     static const int NUMBER_COUNT;
@@ -56,11 +56,9 @@ public:
         int max_size = static_cast<int>(body_.size()) - 1;
         for (int i = max_size; i >= 0; --i) {
             if (i != max_size) {
-                int base_number = BigInteger::BASE;
-                while (body_[i] < base_number / 10) {
+                std::string base_number = std::to_string(body_[i]);
+                for (int j = 0; j < BigInteger::NUMBER_COUNT - static_cast<int>(base_number.size()); ++j)
                     new_object += '0';
-                    base_number /= 10;
-                }
             }
             new_object += std::to_string(body_[i]);
         }
@@ -124,6 +122,10 @@ public:
         } else {
             return other.more_if_equal_sign(*this);
         }
+    }
+
+    explicit operator bool() const {
+        return (*this != 0);
     }
 
     bool operator< (const BigInteger& other) const {
@@ -205,6 +207,17 @@ public:
             minus_if_same_sign(other);
         }
         return *this;
+    }
+
+    BigInteger& operator++() {
+        *this += 1;
+        return *this;
+    }
+
+    BigInteger operator++(int) {
+        BigInteger new_object = *this;
+        *this += 1;
+        return new_object;
     }
 
     BigInteger& operator-= (const BigInteger& other) {
@@ -328,20 +341,17 @@ std::istream& operator >> (std::istream& cin, BigInteger& input) {
     return cin;
 }
 
-std::ostream& operator << (std::ostream& cout, BigInteger& output) {
+std::ostream& operator << (std::ostream& cout, const BigInteger& output) {
     if (output.negative())
         cout << '-';
     int max_size = static_cast<int>(output.body_.size()) - 1;
     for (int i = max_size; i >= 0; --i) {
         if (i != max_size) {
-            int base_number = BigInteger::BASE;
-            while (output.body_[i] < base_number / 10) {
+            std::string base_number = std::to_string(output.body_[i]);
+            for (int j = 0; j < BigInteger::NUMBER_COUNT - static_cast<int>(base_number.size()); ++j)
                 cout << 0;
-                base_number /= 10;
-            }
         }
         std::cout << output.body_[i];
     }
     return cout;
 }
-
