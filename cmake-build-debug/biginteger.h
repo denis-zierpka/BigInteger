@@ -255,8 +255,13 @@ public:
     }
 
     void division(const BigInteger& other, BigInteger& a, BigInteger& new_body) {
+        if (*this == 0 && other == 0) {
+            return;
+        }
         if (other == 1 || other == -1) {
-            negative_ = (negative_ != other.negative_);
+            a = 0;
+            new_body = *this;
+            new_body.negative_ = (negative_ != other.negative_);
             return;
         }
         for (int i = size() - 1; i >= 0;) {
@@ -268,7 +273,7 @@ public:
                     break;
             }
             int q = 0;
-            while (a.more_if_equal_sign(other) || a == other) {
+            while (a.more_if_equal_sign(other) || a == other || a == -other) {
                 if (!other.negative())
                     a -= other;
                 else
