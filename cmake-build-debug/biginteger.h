@@ -41,9 +41,16 @@ public:
         }
     }
 
-    BigInteger(const int element): BigInteger(std::to_string(element)) {}
+    BigInteger(int element): BigInteger(std::to_string(element)) {}
 
-    std::string toString() {
+    BigInteger& operator= (const BigInteger& other) {
+        if (this == &other) return *this;
+        BigInteger new_other = other;
+        swap(new_other);
+        return *this;
+    }
+
+    std::string toString() const {
         std::string new_object;
         if (negative())
             new_object += '-';
@@ -315,8 +322,8 @@ public:
     }
 };
 
-const int BigInteger::NUMBER_COUNT = 4;
-const int BigInteger::BASE = 10000;
+const int BigInteger::NUMBER_COUNT = 1;
+const int BigInteger::BASE = 10;
 
 BigInteger operator"" _bi(unsigned long long element) {
     BigInteger new_object = element;
@@ -379,8 +386,6 @@ std::ostream& operator << (std::ostream& cout, const BigInteger& output) {
 
 
 class Rational {
-    friend std::ostream& operator << (std::ostream& cout, const Rational& output);
-
 public:
     static const int NUMBER_COUNT;
     static const int BASE;
@@ -406,7 +411,14 @@ public:
         normalize();
     }
 
-    std::string toString() {
+    Rational& operator= (const Rational& other) {
+        if (this == &other) return *this;
+        Rational new_other = other;
+        swap(new_other);
+        return *this;
+    }
+
+    std::string toString() const {
         std::string new_object;
         if (negative())
             new_object += '-';
@@ -428,7 +440,7 @@ public:
         if (precision > 0) {
             new_object += ',';
             BigInteger base_number = 10;
-            for (int i = 0; i < precision; ++i) {
+            for (size_t i = 0; i < precision; ++i) {
                 rest *= base_number;
                 new_object += (rest / denominator_).toString();
                 rest %= denominator_;
@@ -447,6 +459,12 @@ public:
 
     bool negative() const {
         return negative_;
+    }
+
+    void swap(Rational& other) {
+        std::swap(numerator_, other.numerator_);
+        std::swap(denominator_, other.denominator_);
+        std::swap(negative_, other.negative_);
     }
 
     BigInteger gcd(const BigInteger& a, const BigInteger& b) {
@@ -505,29 +523,6 @@ public:
         return !(*this == other);
     }
 
-
-    Rational& operator++() {
-        *this += 1;
-        return *this;
-    }
-
-    Rational operator++(int) {
-        Rational new_object = *this;
-        *this += 1;
-        return new_object;
-    }
-
-    Rational& operator--() {
-        *this -= 1;
-        return *this;
-    }
-
-    Rational operator--(int) {
-        Rational new_object = *this;
-        *this -= 1;
-        return new_object;
-    }
-
     Rational& operator+= (const Rational& other) {
         numerator_ *= (negative_ ? -1 : 1);
         negative_ = false;
@@ -535,6 +530,7 @@ public:
         numerator_ += (other.negative_ ? -1 : 1) * other.numerator_ * denominator_;
         denominator_ *= other.denominator_;
         normalize();
+        return *this;
     }
 
     Rational& operator-= (const Rational& other) {
@@ -544,6 +540,7 @@ public:
         numerator_ -= (other.negative_ ? -1 : 1) * other.numerator_ * denominator_;
         denominator_ *= other.denominator_;
         normalize();
+        return *this;
     }
 
     Rational& operator*= (const Rational& other) {
@@ -551,6 +548,7 @@ public:
         denominator_ *= other.denominator_;
         negative_ = (negative_ != other.negative_);
         normalize();
+        return *this;
     }
 
     Rational& operator/= (const Rational& other) {
@@ -558,11 +556,12 @@ public:
         denominator_ *= other.numerator_;
         negative_ = (negative_ != other.negative_);
         normalize();
+        return *this;
     }
 };
 
-const int Rational::NUMBER_COUNT = 4;
-const int Rational::BASE = 10000;
+const int Rational::NUMBER_COUNT = 1;
+const int Rational::BASE = 10;
 
 
 Rational operator+ (const Rational& object, const Rational& other) {
