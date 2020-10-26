@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 #include <sstream>
+#define PP( expr ) std::cerr<<#expr<<" "<<expr<<" ";
 
 
 class BigInteger {
@@ -20,7 +21,7 @@ public:
 
     BigInteger(const BigInteger& other): body_(other.body_), negative_(other.negative_) {}
 
-    explicit BigInteger(const std::string& value): BigInteger() {
+    BigInteger(const std::string& value): BigInteger() {
         body_.clear();
         negative_ = false;
         int is_negative = 0;
@@ -39,14 +40,16 @@ public:
             i -= max_number_of_symbols - 1;
             body_.push_back(new_number);
         }
+        normalize();
     }
 
-    BigInteger(int element): BigInteger(std::to_string(element)) {}
+    BigInteger(long long element): BigInteger(std::to_string(element)) {}
 
     BigInteger& operator= (const BigInteger& other) {
         if (this == &other) return *this;
-        BigInteger new_other = other;
-        swap(new_other);
+        body_ = other.body_;
+        negative_ = other.negative_;
+        normalize();
         return *this;
     }
 
@@ -70,13 +73,17 @@ public:
         return negative_;
     }
 
-    void change_sign() {
-        negative_ = !negative_;
+    BigInteger abs() const {
+        BigInteger new_object = *this;
+        if (new_object.negative()) {
+            new_object.change_sign();
+            new_object.normalize();
+        }
+        return new_object;
     }
 
-    void swap(BigInteger& other) {
-        std::swap(body_, other.body_);
-        std::swap(negative_, other.negative_);
+    void change_sign() {
+        negative_ = !negative_;
     }
 
     int size() const {
@@ -84,9 +91,13 @@ public:
     }
 
     BigInteger operator-() const {
+        //std::cerr << "- " << *this << ' ';
+        //PP(this);
+        //std::cerr << std::endl;
         BigInteger new_object = *this;
         new_object.negative_ = !new_object.negative_;
         new_object.normalize();
+        //std::cerr << *this << std::endl;
         return new_object;
     }
 
@@ -156,21 +167,21 @@ public:
     void plus_if_same_sign(const BigInteger& other) {
         while (other.size() > size())
             body_.push_back(0);
-        for (int i = 0; i < std::max(size(), other.size()); ++i) {
+        for (int i = 0; i < size(); ++i) {
             if (i < other.size())
                 body_[i] += other.body_[i];
+        }
+        for (int i = 0; i < size(); ++i) {
             if (body_[i] >= BASE) {
-                body_[i] -= BASE;
                 if (i + 1 < size()) {
-                    body_[i + 1]++;
+                    body_[i + 1] += body_[i] / BASE;
+                    body_[i] %= BASE;
                 } else {
-                    body_.push_back(1);
+                    body_.push_back(body_[i] / BASE);
+                    body_[i] %= BASE;
                 }
             }
         }
-        while (size() > 1 && body_[size() - 1] == 0)
-            body_.pop_back();
-
         normalize();
     }
 
@@ -190,88 +201,110 @@ public:
                 }
             }
         }
-        for (int i = 0; i < std::max(size(), other.size()); ++i) {
+        for (int i = 0; i < size(); ++i) {
             if (body_[i] < 0) {
-                body_[i] += BASE;
-                body_[i + 1]--;
+                body_[i + 1] -= std::abs(body_[i]) / BASE;
+                body_[i] %= BASE;
+                if (body_[i] < 0) {
+                    body_[i] += BASE;
+                    body_[i + 1]--;
+                }
             }
         }
-
-        while (size() > 1 && body_[size() - 1] == 0)
-            body_.pop_back();
         if (second_more)
             negative_ = !negative_;
-
         normalize();
     }
 
     BigInteger& operator+= (const BigInteger& other) {
+        //std::cerr << "+= " << *this << ' ' << other << ' ';
+        //PP(this);
+        //PP(&other);
+        //std::cerr << std::endl;
         if ((negative() && other.negative()) || (!negative() && !other.negative())) {
             plus_if_same_sign(other);
         } else {
             minus_if_same_sign(other);
         }
+        //std::cerr << *this << std::endl;
         return *this;
     }
 
     BigInteger& operator++() {
         *this += 1;
+        normalize();
         return *this;
     }
 
     BigInteger operator++(int) {
         BigInteger new_object = *this;
         *this += 1;
+        normalize();
         return new_object;
     }
 
     BigInteger& operator--() {
         *this -= 1;
+        normalize();
         return *this;
     }
 
     BigInteger operator--(int) {
         BigInteger new_object = *this;
         *this -= 1;
+        normalize();
         return new_object;
     }
 
     BigInteger& operator-= (const BigInteger& other) {
+        //std::cerr << "-= " << *this << ' ' << other << ' ';
+        //PP(this);
+        //PP(&other);
+        //std::cerr << std::endl;
         if ((!negative() && !other.negative()) || (negative() && other.negative())) {
             minus_if_same_sign(other);
         } else {
             plus_if_same_sign(other);
         }
+        //std::cerr << *this << std::endl;
         return *this;
     }
 
     BigInteger& operator*= (const BigInteger& other) {
+        //std::cerr << "*= " << *this << ' ' << other << ' ';
+        //PP(this);
+        //PP(&other);
+        //std::cerr << std::endl;
         int new_size = size() + other.size() + 2;
         BigInteger new_body = BigInteger();
         new_body.body_.resize(new_size);
         for (int i = 0; i < size(); ++i) {
             for (int j = 0; j < other.size(); ++j) {
                 new_body.body_[i + j] += body_[i] * other.body_[j];
-                new_body.body_[i + j + 1] += new_body.body_[i + j] / BASE;
-                new_body.body_[i + j] %= BASE;
             }
         }
-        for (int i = 0; i < size(); ++i) {
+        for (int i = 0; i < new_body.size() - 1; ++i) {
             if (new_body.body_[i] >= BASE) {
                 new_body.body_[i + 1] += new_body.body_[i] / BASE;
                 new_body.body_[i] %= BASE;
             }
         }
-        while (new_body.size() > 1 && new_body.body_[new_body.size() - 1] == 0) {
-            new_body.body_.pop_back();
-        }
         new_body.negative_ = (negative_ != other.negative_);
-        swap(new_body);
+        *this = new_body;
+        normalize();
+        //std::cerr << *this << std::endl;
         return *this;
     }
 
     void division(const BigInteger& other, BigInteger& a, BigInteger& new_body) {
-        if (*this == 0 && other == 0) {
+        if (*this == other) {
+            a = 0;
+            new_body = 1;
+            return;
+        }
+        if (other == 0) {
+            a = *this;
+            new_body = *this;
             return;
         }
         if (other == 1 || other == -1) {
@@ -280,14 +313,11 @@ public:
             new_body.negative_ = (negative_ != other.negative_);
             return;
         }
-        for (int i = size() - 1; i >= 0;) {
-            while (other.more_if_equal_sign(a)) {
-                a *= BASE;
-                a += body_[i];
-                i--;
-                if (i == -1)
-                    break;
-            }
+        a = 0;
+        new_body = 0;
+        for (int i = size() - 1; i >= 0; --i) {
+            a *= BASE;
+            a += body_[i];
             int q = 0;
             while (a.more_if_equal_sign(other) || a == other || a == -other) {
                 if (!other.negative())
@@ -304,20 +334,30 @@ public:
     }
 
     BigInteger& operator/= (const BigInteger& other) {
+        //std::cerr << "/= " << *this << ' ' << other << ' ';
+        //PP(this);
+        //PP(&other);
+        //std::cerr << std::endl;
         BigInteger a = BigInteger();
         BigInteger new_body = BigInteger();
         division(other, a, new_body);
         *this = new_body;
         normalize();
+        //std::cerr << *this << std::endl;
         return *this;
     }
 
     BigInteger& operator%= (const BigInteger& other) {
+        //std::cerr << "%= " << *this << ' ' << other << ' ';
+        //PP(this);
+        //PP(&other);
+        //std::cerr<< std::endl;
         BigInteger a = BigInteger();
         BigInteger new_body = BigInteger();
         division(other, a, new_body);
         *this = a;
         normalize();
+        //std::cerr << *this << std::endl;
         return *this;
     }
 };
@@ -360,26 +400,18 @@ BigInteger operator% (const BigInteger& object, const BigInteger& other) {
     return new_object;
 }
 
-std::istream& operator >> (std::istream& cin, BigInteger& input) {
+std::istream& operator >> (std::istream& in, BigInteger& input) {
     std::string new_input;
-    std::cin >> new_input;
+    in >> new_input;
     input = BigInteger(new_input);
-    return cin;
+    input.normalize();
+    return in;
 }
 
-std::ostream& operator << (std::ostream& cout, const BigInteger& output) {
-    if (output.negative())
-        cout << '-';
-    int max_size = static_cast<int>(output.body_.size()) - 1;
-    for (int i = max_size; i >= 0; --i) {
-        if (i != max_size) {
-            std::string base_number = std::to_string(output.body_[i]);
-            for (int j = 0; j < BigInteger::NUMBER_COUNT - static_cast<int>(base_number.size()); ++j)
-                cout << 0;
-        }
-        std::cout << output.body_[i];
-    }
-    return cout;
+std::ostream& operator << (std::ostream& out, const BigInteger& output) {
+    std::string result = output.toString();
+    out << result;
+    return out;
 }
 
 
@@ -390,38 +422,43 @@ public:
     static const int NUMBER_COUNT;
     static const int BASE;
 
-private:
+public:   // TODO
     BigInteger numerator_;
     BigInteger denominator_;
-    bool negative_;
 
 public:
-    Rational(): numerator_(0), denominator_(1), negative_(false) {}
+    Rational(): numerator_(0), denominator_(1) {
+        //std::cerr << "Rat0" << std::endl;
+    }
 
     Rational(const Rational& other): numerator_(other.numerator_),
-            denominator_(other.denominator_), negative_(other.negative_) {}
+            denominator_(other.denominator_) {
+        //std::cerr << "Rat1" << std::endl;
+        normalize();
+    }
 
     Rational(const BigInteger& element):
-            numerator_(element), denominator_(1), negative_(false) {
+            numerator_(element), denominator_(1) {
+        //std::cerr << "Rat2" << std::endl;
         normalize();
     }
 
     Rational(const int element):
-            numerator_(element), denominator_(1), negative_(false) {
+            numerator_(element), denominator_(1) {
+        //std::cerr << "Rat3" << std::endl;
         normalize();
     }
 
     Rational& operator= (const Rational& other) {
         if (this == &other) return *this;
-        Rational new_other = other;
-        swap(new_other);
+        numerator_ = other.numerator_;
+        denominator_ = other.denominator_;
+        normalize();
         return *this;
     }
 
     std::string toString() const {
         std::string new_object;
-        if (negative())
-            new_object += '-';
         new_object += numerator_.toString();
         if (denominator_ != 1) {
             new_object += '/';
@@ -431,14 +468,14 @@ public:
     }
 
     std::string asDecimal(size_t precision = 0) const {
-        BigInteger max_real = numerator_ / denominator_;
-        BigInteger rest = numerator_ % denominator_;
+        BigInteger max_real = numerator_.abs() / denominator_;
+        BigInteger rest = numerator_.abs() % denominator_;
         std::string new_object;
-        if (negative())
+        if (numerator_.negative())
             new_object += '-';
         new_object += max_real.toString();
         if (precision > 0) {
-            new_object += ',';
+            new_object += '.';
             BigInteger base_number = 10;
             for (size_t i = 0; i < precision; ++i) {
                 rest *= base_number;
@@ -457,30 +494,18 @@ public:
         return result;
     }
 
-    bool negative() const {
-        return negative_;
-    }
-
-    void swap(Rational& other) {
-        std::swap(numerator_, other.numerator_);
-        std::swap(denominator_, other.denominator_);
-        std::swap(negative_, other.negative_);
-    }
-
     BigInteger gcd(const BigInteger& a, const BigInteger& b) {
         return (a != 0 ? gcd(b % a, a) : b);
     }
 
     void normalize() {
-        if (numerator_.negative()) {
-            numerator_.change_sign();
-            negative_ = !negative_;
-        }
         if (denominator_.negative()) {
             denominator_.change_sign();
-            negative_ = !negative_;
+            numerator_.change_sign();
         }
-        BigInteger gcd_save = gcd(numerator_, denominator_);
+        numerator_.normalize();
+        denominator_.normalize();
+        BigInteger gcd_save = gcd(numerator_.abs(), denominator_.abs());
         if (gcd_save > 1) {
             numerator_ /= gcd_save;
             denominator_ /= gcd_save;
@@ -489,7 +514,7 @@ public:
 
     Rational operator-() const {
         Rational new_object = *this;
-        new_object.negative_ = !new_object.negative_;
+        new_object.numerator_ = -new_object.numerator_;
         new_object.normalize();
         return new_object;
     }
@@ -507,8 +532,7 @@ public:
     }
 
     bool operator== (const Rational& other) const {
-        return (negative_ == other.negative_ &&
-            numerator_ == other.numerator_ && denominator_ && other.denominator_);
+        return (numerator_ == other.numerator_ && denominator_ == other.denominator_);
     }
 
     bool operator>= (const Rational& other) const {
@@ -524,20 +548,16 @@ public:
     }
 
     Rational& operator+= (const Rational& other) {
-        numerator_ *= (negative_ ? -1 : 1);
-        negative_ = false;
         numerator_ *= other.denominator_;
-        numerator_ += (other.negative_ ? -1 : 1) * other.numerator_ * denominator_;
+        numerator_ += other.numerator_ * denominator_;
         denominator_ *= other.denominator_;
         normalize();
         return *this;
     }
 
     Rational& operator-= (const Rational& other) {
-        numerator_ *= (negative_ ? -1 : 1);
-        negative_ = false;
         numerator_ *= other.denominator_;
-        numerator_ -= (other.negative_ ? -1 : 1) * other.numerator_ * denominator_;
+        numerator_ -= other.numerator_ * denominator_;
         denominator_ *= other.denominator_;
         normalize();
         return *this;
@@ -546,7 +566,6 @@ public:
     Rational& operator*= (const Rational& other) {
         numerator_ *= other.numerator_;
         denominator_ *= other.denominator_;
-        negative_ = (negative_ != other.negative_);
         normalize();
         return *this;
     }
@@ -554,15 +573,10 @@ public:
     Rational& operator/= (const Rational& other) {
         numerator_ *= other.denominator_;
         denominator_ *= other.numerator_;
-        negative_ = (negative_ != other.negative_);
         normalize();
         return *this;
     }
 };
-
-const int Rational::NUMBER_COUNT = 1;
-const int Rational::BASE = 10;
-
 
 Rational operator+ (const Rational& object, const Rational& other) {
     Rational new_object = object;
@@ -586,4 +600,18 @@ Rational operator/ (const Rational& object, const Rational& other) {
     Rational new_object = object;
     new_object /= other;
     return new_object;
+}
+
+std::istream& operator >> (std::istream& in, Rational& input) {
+    std::cerr << "operator cin for Rational" << std::endl;
+    std::string new_input;
+    in >> new_input;
+    input = BigInteger(new_input);
+    input.normalize();
+    return in;
+}
+
+std::ostream& operator << (std::ostream& out, const Rational& output) {
+    out << output.toString();
+    return out;
 }
