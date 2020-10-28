@@ -5,6 +5,7 @@
 #include <complex>
 
 
+
 using ld = long double;
 using cld = std::complex<long double>;
 long double pi = acos(-1);
@@ -12,7 +13,9 @@ long double pi = acos(-1);
 std::vector<cld> convert_to_complex(const std::vector<int>& object, int max_size);
 std::vector<int> convert_to_int(std::vector<cld>& object);
 void fft(std::vector<cld>& object, bool reversed_fft);
+void fft2(std::vector<cld>& object, bool reversed_fft);
 void reversed_fft(std::vector<cld>& object);
+void reversed_fft2(std::vector<cld>& object);
 
 
 
@@ -291,12 +294,12 @@ public:
         int max_size = std::max(size(), other.size());
         std::vector<cld> first_number = convert_to_complex(body_, max_size);
         std::vector<cld> second_number = convert_to_complex(other.body_, max_size);
-        fft(first_number, false);
-        fft(second_number, false);
+        fft2(first_number, false);
+        fft2(second_number, false);
         for (int i = 0; i < static_cast<int>(first_number.size()); ++i) {
             first_number[i] *= second_number[i];
         }
-        reversed_fft(first_number);
+        reversed_fft2(first_number);
         std::vector<int> new_number = convert_to_int(first_number);
         body_ = new_number;
         negative_ = (negative_ != other.negative_);
@@ -471,6 +474,41 @@ void fft(std::vector<cld>& object, bool reversed_fft) {
     }
 }
 
+int rb(int a, int n) {
+    int ans = 0;
+    while (a > 0) {
+        ans += (a % 2) * (n / 2);
+        a /= 2;
+        n /= 2;
+    }
+    return ans;
+}
+
+void fft2(std::vector<cld>& object, bool reversed_fft2) {
+    int n = object.size();
+    for (int i = 0; i < n; ++i) {
+        if (i < rb(i, n))
+            swap(object[i], object[rb(i, n)]);
+    }
+    for (int len = 2; len <= n; len *= 2) {
+        for (int i = 0; i < n; i += len) {
+            ld angle = 2 * pi / len;
+            if (reversed_fft2) {
+                angle *= -1;
+            }
+            cld r = 1;
+            cld w(cos(angle), sin(angle));
+            for (int j = i; j < i + len / 2; ++j) {
+                cld save = (object[j] + object[j + len / 2] * r);
+                cld save2 = (object[j] - object[j + len / 2] * r);
+                object[j] = save;
+                object[j + len / 2] = save2;
+                r *= w;
+            }
+        }
+    }
+}
+
 void reversed_fft(std::vector<cld>& object) {
     fft(object, true);
     for (int i = 0; i < static_cast<int>(object.size()); ++i) {
@@ -479,6 +517,13 @@ void reversed_fft(std::vector<cld>& object) {
     }
 }
 
+void reversed_fft2(std::vector<cld>& object) {
+    fft2(object, true);
+    for (int i = 0; i < static_cast<int>(object.size()); ++i) {
+        object[i] /= object.size();
+        object[i] = floor(object[i].real() + (ld)0.5);
+    }
+}
 
 
 
