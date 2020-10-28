@@ -2,6 +2,18 @@
 #include <vector>
 #include <string>
 #include <sstream>
+#include <complex>
+
+
+using ld = long double;
+using cld = std::complex<long double>;
+long double pi = acos(-1);
+
+std::vector<cld> convert_to_complex(const std::vector<int>& object, int max_size);
+std::vector<int> convert_to_int(std::vector<cld>& object);
+void fft(std::vector<cld>& object, bool reversed_fft);
+void reversed_fft(std::vector<cld>& object);
+
 
 
 class BigInteger {
@@ -104,6 +116,26 @@ public:
             negative_ = false;
         } else if (size() == 1 && body_[0] == 0) {
             negative_ = false;
+        }
+
+        for (int i = 0; i < size(); ++i) {
+            if (body_[i] >= BASE) {
+                if (i + 1 < size()) {
+                    body_[i + 1] += body_[i] / BASE;
+                    body_[i] %= BASE;
+                } else {
+                    body_.push_back(body_[i] / BASE);
+                    body_[i] %= BASE;
+                }
+            }
+            if (body_[i] < 0) {
+                body_[i + 1] -= std::abs(body_[i]) / BASE;
+                body_[i] %= BASE;
+                if (body_[i] < 0) {
+                    body_[i] += BASE;
+                    body_[i + 1]--;
+                }
+            }
         }
     }
 
@@ -256,22 +288,18 @@ public:
     }
 
     BigInteger& operator*= (const BigInteger& other) {
-        int new_size = size() + other.size() + 2;
-        BigInteger new_body = BigInteger();
-        new_body.body_.resize(new_size);
-        for (int i = 0; i < size(); ++i) {
-            for (int j = 0; j < other.size(); ++j) {
-                new_body.body_[i + j] += body_[i] * other.body_[j];
-            }
+        int max_size = std::max(size(), other.size());
+        std::vector<cld> first_number = convert_to_complex(body_, max_size);
+        std::vector<cld> second_number = convert_to_complex(other.body_, max_size);
+        fft(first_number, false);
+        fft(second_number, false);
+        for (int i = 0; i < static_cast<int>(first_number.size()); ++i) {
+            first_number[i] *= second_number[i];
         }
-        for (int i = 0; i < new_body.size() - 1; ++i) {
-            if (new_body.body_[i] >= BASE) {
-                new_body.body_[i + 1] += new_body.body_[i] / BASE;
-                new_body.body_[i] %= BASE;
-            }
-        }
-        new_body.negative_ = (negative_ != other.negative_);
-        *this = new_body;
+        reversed_fft(first_number);
+        std::vector<int> new_number = convert_to_int(first_number);
+        body_ = new_number;
+        negative_ = (negative_ != other.negative_);
         normalize();
         return *this;
     }
@@ -332,8 +360,8 @@ public:
     }
 };
 
-const int BigInteger::NUMBER_COUNT = 1;
-const int BigInteger::BASE = 10;
+const int BigInteger::NUMBER_COUNT = 4;
+const int BigInteger::BASE = 10000;
 
 BigInteger operator"" _bi(unsigned long long element) {
     BigInteger new_object = element;
@@ -383,6 +411,74 @@ std::ostream& operator << (std::ostream& out, const BigInteger& output) {
     out << result;
     return out;
 }
+
+
+std::vector<cld> convert_to_complex(const std::vector<int>& object, int max_size) {
+    int power_2 = 1;
+    while (power_2 < max_size) {
+        power_2 *= 2;
+    }
+    power_2 *= 2;
+    std::vector<cld> ans;
+    for (int i : object) {
+        cld w(i);
+        ans.push_back(w);
+    }
+    int size_a = static_cast<int>(object.size());
+    for (int i = 0; i < power_2 - size_a; ++i) {
+        cld w(0);
+        ans.push_back(w);
+    }
+    return ans;
+}
+
+std::vector<int> convert_to_int(std::vector<cld>& object) {
+    std::vector<int> ans;
+    for (auto & i : object) {
+        ans.push_back(i.real());
+    }
+    return ans;
+}
+
+void fft(std::vector<cld>& object, bool reversed_fft) {
+    if (object.size() == 1) {
+        return;
+    }
+    ld angle = 2 * pi / object.size();
+    cld r = 1;
+    if (reversed_fft) {
+        angle *= -1;
+    }
+    cld w(cos(angle), sin(angle));
+    std::vector<cld> first_part, second_part;
+    for (int i = 0; i < static_cast<int>(object.size()); ++i) {
+        if (i % 2 == 0) {
+            first_part.push_back(object[i]);
+        } else {
+            second_part.push_back(object[i]);
+        }
+    }
+    fft(first_part, reversed_fft);
+    fft(second_part, reversed_fft);
+
+    for (int i = 0; i < static_cast<int>(first_part.size()); ++i) {
+        object[i] = first_part[i] + second_part[i] * r;
+        r *= w;
+    }
+    for (int i = 0; i < static_cast<int>(first_part.size()); ++i) {
+        object[i + first_part.size()] = first_part[i] + second_part[i] * r;
+        r *= w;
+    }
+}
+
+void reversed_fft(std::vector<cld>& object) {
+    fft(object, true);
+    for (int i = 0; i < static_cast<int>(object.size()); ++i) {
+        object[i] /= object.size();
+        object[i] = floor(object[i].real() + (ld)0.5);
+    }
+}
+
 
 
 
