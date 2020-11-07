@@ -288,6 +288,27 @@ public:
         return *this;
     }
 
+    BigInteger& mult(const BigInteger& other) {
+        int new_size = size() + other.size() + 2;
+        BigInteger new_body = BigInteger();
+        new_body.body_.resize(new_size);
+        for (int i = 0; i < size(); ++i) {
+            for (int j = 0; j < other.size(); ++j) {
+                new_body.body_[i + j] += body_[i] * other.body_[j];
+            }
+        }
+        for (int i = 0; i < new_body.size() - 1; ++i) {
+            if (new_body.body_[i] >= BASE) {
+                new_body.body_[i + 1] += new_body.body_[i] / BASE;
+                new_body.body_[i] %= BASE;
+            }
+        }
+        new_body.negative_ = (negative_ != other.negative_);
+        *this = new_body;
+        normalize();
+        return *this;
+    }
+
     BigInteger& operator*= (const BigInteger& other) {
         int max_size = std::max(size(), other.size());
         std::vector<cld> first_number = convert_to_complex(body_, max_size);
@@ -325,7 +346,7 @@ public:
         a = 0;
         new_body = 0;
         for (int i = size() - 1; i >= 0; --i) {
-            a *= BASE;
+            a.mult(BASE);
             a += body_[i];
             int q = 0;
             while (a.more_if_equal_sign(other) || a == other || a == -other) {
@@ -335,7 +356,7 @@ public:
                     a += other;
                 ++q;
             }
-            new_body *= BASE;
+            new_body.mult(BASE);
             new_body += q;
         }
         new_body.negative_ = (negative_ != other.negative_);
