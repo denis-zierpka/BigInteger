@@ -5,9 +5,8 @@
 #include <complex>
 
 
-
 using ld = long double;
-using cld = std::complex<long double>;
+using cld = std::complex<ld>;
 long double pi = acos(-1);
 
 std::vector<cld> convert_to_complex(const std::vector<int>& object, int max_size);
@@ -16,10 +15,7 @@ void fft(std::vector<cld>& object, bool reversed_fft);
 void reversed_fft(std::vector<cld>& object);
 
 
-
 class BigInteger {
-    friend std::ostream& operator << (std::ostream& cout, const BigInteger& output);
-
 public:
     static const int NUMBER_COUNT;
     static const int BASE;
@@ -85,19 +81,6 @@ public:
         return negative_;
     }
 
-    BigInteger abs() const {
-        BigInteger new_object = *this;
-        if (new_object.negative()) {
-            new_object.change_sign();
-            new_object.normalize();
-        }
-        return new_object;
-    }
-
-    void change_sign() {
-        negative_ = !negative_;
-    }
-
     int size() const {
         return static_cast<int>(body_.size());
     }
@@ -112,22 +95,15 @@ public:
     void normalize() {
         while (size() > 1 && body_[size() - 1] == 0)
             body_.pop_back();
-        if (size() == 0) {
-            body_.push_back(0);
-            negative_ = false;
-        } else if (size() == 1 && body_[0] == 0) {
+        if (size() == 1 && body_[0] == 0) {
             negative_ = false;
         }
-
         for (int i = 0; i < size(); ++i) {
             if (body_[i] >= BASE) {
-                if (i + 1 < size()) {
-                    body_[i + 1] += body_[i] / BASE;
-                    body_[i] %= BASE;
-                } else {
-                    body_.push_back(body_[i] / BASE);
-                    body_[i] %= BASE;
-                }
+                if (i + 1 >= size())
+                    body_.push_back(0);
+                body_[i + 1] += body_[i] / BASE;
+                body_[i] %= BASE;
             }
             if (body_[i] < 0) {
                 body_[i + 1] -= std::abs(body_[i]) / BASE;
@@ -140,112 +116,39 @@ public:
         }
     }
 
-    bool more_if_equal_sign(const BigInteger& other) const {
-        if (size() > other.size()) {
-            return true;
-        } else if (size() < other.size()) {
-            return false;
-        } else {
-            for (int i = size() - 1; i >= 0; --i) {
-                if (body_[i] < other.body_[i])
-                    return false;
-                if (body_[i] > other.body_[i])
-                    return true;
-            }
-            return false;
-        }
-    }
-
     bool operator> (const BigInteger& other) const {
-        if (!negative() && other.negative()) {
-            return true;
-        } else if (negative() && !other.negative()) {
-            return false;
-        } else if (!negative() && !other.negative()) {
-            return more_if_equal_sign(other);
-        } else {
-            return other.more_if_equal_sign(*this);
+        if (negative_ == other.negative_) {
+            return (negative_ ? other : *this).more_if_equal_sign(negative_ ? *this : other);
         }
+        return !negative_;
     }
 
     explicit operator bool() const {
-        return (*this != 0);
+        return *this != 0;
     }
 
     bool operator< (const BigInteger& other) const {
-        return (other > *this);
+        return other > *this;
     }
 
     bool operator== (const BigInteger& other) const {
-        return (size() == other.size() && !(*this > other) && !(other > *this));
+        return size() == other.size() && !(*this > other) && !(other > *this);
     }
 
     bool operator>= (const BigInteger& other) const {
-        return (*this > other || *this == other);
+        return *this > other || *this == other;
     }
 
     bool operator<= (const BigInteger& other) const {
-        return (*this < other || *this == other);
+        return *this < other || *this == other;
     }
 
     bool operator!= (const BigInteger& other) const {
         return !(*this == other);
     }
 
-    void plus_if_same_sign(const BigInteger& other) {
-        while (other.size() > size())
-            body_.push_back(0);
-        for (int i = 0; i < size(); ++i) {
-            if (i < other.size())
-                body_[i] += other.body_[i];
-        }
-        for (int i = 0; i < size(); ++i) {
-            if (body_[i] >= BASE) {
-                if (i + 1 < size()) {
-                    body_[i + 1] += body_[i] / BASE;
-                    body_[i] %= BASE;
-                } else {
-                    body_.push_back(body_[i] / BASE);
-                    body_[i] %= BASE;
-                }
-            }
-        }
-        normalize();
-    }
-
-    void minus_if_same_sign(const BigInteger& other) {
-        bool second_more = false;
-        if (!more_if_equal_sign(other)) {
-            second_more = true;
-        }
-        while (other.size() > size())
-            body_.push_back(0);
-        for (int i = 0; i < size(); ++i) {
-            if (i < other.size()) {
-                if (second_more) {
-                    body_[i] += other.body_[i] - 2 * body_[i];
-                } else {
-                    body_[i] -= other.body_[i];
-                }
-            }
-        }
-        for (int i = 0; i < size(); ++i) {
-            if (body_[i] < 0) {
-                body_[i + 1] -= std::abs(body_[i]) / BASE;
-                body_[i] %= BASE;
-                if (body_[i] < 0) {
-                    body_[i] += BASE;
-                    body_[i + 1]--;
-                }
-            }
-        }
-        if (second_more)
-            negative_ = !negative_;
-        normalize();
-    }
-
     BigInteger& operator+= (const BigInteger& other) {
-        if ((negative() && other.negative()) || (!negative() && !other.negative())) {
+        if (negative() == other.negative()) {
             plus_if_same_sign(other);
         } else {
             minus_if_same_sign(other);
@@ -280,12 +183,93 @@ public:
     }
 
     BigInteger& operator-= (const BigInteger& other) {
-        if ((!negative() && !other.negative()) || (negative() && other.negative())) {
+        if (!negative() == !other.negative()) {
             minus_if_same_sign(other);
         } else {
             plus_if_same_sign(other);
         }
         return *this;
+    }
+
+    BigInteger& operator*= (const BigInteger& other) {
+        int max_size = std::max(size(), other.size());
+        std::vector<cld> first_number = convert_to_complex(body_, max_size);
+        std::vector<cld> second_number = convert_to_complex(other.body_, max_size);
+        fft(first_number, false);
+        fft(second_number, false);
+        for (int i = 0; i < static_cast<int>(first_number.size()); ++i) {
+            first_number[i] *= second_number[i];
+        }
+        reversed_fft(first_number);
+        std::vector<int> new_number = convert_to_int(first_number);
+        body_ = new_number;
+        negative_ = (negative_ != other.negative_);
+        normalize();
+        return *this;
+    }
+
+    BigInteger& operator/= (const BigInteger& other) {
+        BigInteger a = BigInteger();
+        BigInteger new_body = BigInteger();
+        division(other, a, new_body);
+        *this = new_body;
+        normalize();
+        return *this;
+    }
+
+    BigInteger& operator%= (const BigInteger& other) {
+        BigInteger a = BigInteger();
+        BigInteger new_body = BigInteger();
+        division(other, a, new_body);
+        *this = a;
+        normalize();
+        return *this;
+    }
+
+private:
+
+    bool more_if_equal_sign(const BigInteger& other) const {
+        if (size() == other.size()) {
+            for (int i = size() - 1; i >= 0; --i) {
+                if (body_[i] < other.body_[i])
+                    return false;
+                if (body_[i] > other.body_[i])
+                    return true;
+            }
+            return false;
+        }
+        return size() > other.size();
+    }
+
+    void plus_if_same_sign(const BigInteger& other) {
+        while (other.size() > size())
+            body_.push_back(0);
+        for (int i = 0; i < size(); ++i) {
+            if (i < other.size())
+                body_[i] += other.body_[i];
+        }
+        normalize();
+    }
+
+    void minus_if_same_sign(const BigInteger& other) {
+        bool second_more = false;
+        if (!more_if_equal_sign(other)) {
+            second_more = true;
+        }
+        while (other.size() > size())
+            body_.push_back(0);
+        for (int i = 0; i < size(); ++i) {
+            if (i < other.size()) {
+                if (second_more) {
+                    body_[i] += other.body_[i] - 2 * body_[i];
+                } else {
+                    body_[i] -= other.body_[i];
+                }
+            }
+        }
+        if (second_more)
+            negative_ = !negative_;
+        normalize();
     }
 
     BigInteger& mult(const BigInteger& other) {
@@ -309,32 +293,10 @@ public:
         return *this;
     }
 
-    BigInteger& operator*= (const BigInteger& other) {
-        int max_size = std::max(size(), other.size());
-        std::vector<cld> first_number = convert_to_complex(body_, max_size);
-        std::vector<cld> second_number = convert_to_complex(other.body_, max_size);
-        fft(first_number, false);
-        fft(second_number, false);
-        for (int i = 0; i < static_cast<int>(first_number.size()); ++i) {
-            first_number[i] *= second_number[i];
-        }
-        reversed_fft(first_number);
-        std::vector<int> new_number = convert_to_int(first_number);
-        body_ = new_number;
-        negative_ = (negative_ != other.negative_);
-        normalize();
-        return *this;
-    }
-
     void division(const BigInteger& other, BigInteger& a, BigInteger& new_body) {
         if (*this == other) {
             a = 0;
             new_body = 1;
-            return;
-        }
-        if (other == 0) {
-            a = *this;
-            new_body = *this;
             return;
         }
         if (other == 1 || other == -1) {
@@ -361,24 +323,6 @@ public:
         }
         new_body.negative_ = (negative_ != other.negative_);
         a.negative_ = negative_;
-    }
-
-    BigInteger& operator/= (const BigInteger& other) {
-        BigInteger a = BigInteger();
-        BigInteger new_body = BigInteger();
-        division(other, a, new_body);
-        *this = new_body;
-        normalize();
-        return *this;
-    }
-
-    BigInteger& operator%= (const BigInteger& other) {
-        BigInteger a = BigInteger();
-        BigInteger new_body = BigInteger();
-        division(other, a, new_body);
-        *this = a;
-        normalize();
-        return *this;
     }
 };
 
@@ -434,6 +378,14 @@ std::ostream& operator << (std::ostream& out, const BigInteger& output) {
     return out;
 }
 
+BigInteger abs(const BigInteger& object) {
+    BigInteger new_object = object;
+    if (new_object.negative()) {
+        new_object *= -1;
+        new_object.normalize();
+    }
+    return new_object;
+}
 
 std::vector<cld> convert_to_complex(const std::vector<int>& object, int max_size) {
     int power_2 = 1;
@@ -502,7 +454,7 @@ void reversed_fft(std::vector<cld>& object) {
     fft(object, true);
     for (int i = 0; i < static_cast<int>(object.size()); ++i) {
         object[i] /= object.size();
-        object[i] = floor(object[i].real() + (ld)0.5);
+        object[i] = floorl(object[i].real() + (ld)0.5);
     }
 }
 
@@ -517,7 +469,7 @@ public:
     Rational(): numerator_(0), denominator_(1) {}
 
     Rational(const Rational& other): numerator_(other.numerator_),
-            denominator_(other.denominator_) {
+                                     denominator_(other.denominator_) {
         normalize();
     }
 
@@ -544,8 +496,8 @@ public:
     }
 
     std::string asDecimal(size_t precision = 0) const {
-        BigInteger max_real = numerator_.abs() / denominator_;
-        BigInteger rest = numerator_.abs() % denominator_;
+        BigInteger max_real = abs(numerator_) / denominator_;
+        BigInteger rest = abs(numerator_) % denominator_;
         std::string new_object;
         if (numerator_.negative())
             new_object += '-';
@@ -571,17 +523,17 @@ public:
     }
 
     BigInteger gcd(const BigInteger& a, const BigInteger& b) {
-        return (a != 0 ? gcd(b % a, a) : b);
+        return a != 0 ? gcd(b % a, a) : b;
     }
 
     void normalize() {
         if (denominator_.negative()) {
-            denominator_.change_sign();
-            numerator_.change_sign();
+            denominator_ *= -1;
+            numerator_ *= -1;
         }
         numerator_.normalize();
         denominator_.normalize();
-        BigInteger gcd_save = gcd(numerator_.abs(), denominator_.abs());
+        BigInteger gcd_save = gcd(abs(numerator_), abs(denominator_));
         if (gcd_save > 1) {
             numerator_ /= gcd_save;
             denominator_ /= gcd_save;
@@ -596,27 +548,27 @@ public:
     }
 
     explicit operator bool() const {
-        return (*this != 0);
+        return *this != 0;
     }
 
     bool operator> (const Rational& other) const {
-        return ((numerator_ * other.denominator_) > (other.numerator_ * denominator_));
+        return numerator_ * other.denominator_ > other.numerator_ * denominator_;
     }
 
     bool operator< (const Rational& other) const {
-        return ((numerator_ * other.denominator_) < (other.numerator_ * denominator_));
+        return numerator_ * other.denominator_ < other.numerator_ * denominator_;
     }
 
     bool operator== (const Rational& other) const {
-        return (numerator_ == other.numerator_ && denominator_ == other.denominator_);
+        return numerator_ == other.numerator_ && denominator_ == other.denominator_;
     }
 
     bool operator>= (const Rational& other) const {
-        return (*this > other || *this == other);
+        return *this > other || *this == other;
     }
 
     bool operator<= (const Rational& other) const {
-        return (*this < other || *this == other);
+        return *this < other || *this == other;
     }
 
     bool operator!= (const Rational& other) const {
