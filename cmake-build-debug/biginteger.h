@@ -5,7 +5,6 @@
 #include <complex>
 
 
-
 using ld = long double;
 using cld = std::complex<long double>;
 long double pi = acos(-1);
@@ -24,23 +23,20 @@ public:
 
 private:
     std::vector<int> body_;
-    bool negative_;
+    bool negative_ = false;
 
 public:
     BigInteger(): body_({0}), negative_(false) {}
 
     BigInteger(const BigInteger& other): body_(other.body_), negative_(other.negative_) {}
 
-    BigInteger(const std::string& value): BigInteger() {
+    BigInteger(const std::string& value) {
         body_.clear();
-        negative_ = false;
-        int is_negative = 0;
         if (value[0] == '-') {
             negative_ = true;
-            is_negative = 1;
         }
-        for (int i = static_cast<int>(value.size()) - 1; i >= is_negative; --i) {
-            int max_number_of_symbols = std::min(NUMBER_COUNT, i - is_negative + 1);
+        for (int i = static_cast<int>(value.size()) - 1; i >= (negative_ ? 1 : 0); --i) {
+            int max_number_of_symbols = std::min(NUMBER_COUNT, i - (negative_ ? 1 : 0) + 1);
             int new_number = 0;
             int base_change = 1;
             for (int j = i; j > i - max_number_of_symbols; --j) {
@@ -71,7 +67,7 @@ public:
         for (int i = max_size; i >= 0; --i) {
             if (i != max_size) {
                 std::string base_number = std::to_string(body_[i]);
-                for (int j = 0; j < BigInteger::NUMBER_COUNT - static_cast<int>(base_number.size()); ++j)
+                for (size_t j = 0; j < BigInteger::NUMBER_COUNT - base_number.size(); ++j)
                     new_object += '0';
             }
             new_object += std::to_string(body_[i]);
@@ -99,24 +95,14 @@ public:
     }
 
     void normalize() {
-        while (size() > 1 && body_[size() - 1] == 0)
-            body_.pop_back();
-        if (size() == 0) {
-            body_.push_back(0);
-            negative_ = false;
-        } else if (size() == 1 && body_[0] == 0) {
-            negative_ = false;
-        }
-
         for (int i = 0; i < size(); ++i) {
             if (body_[i] >= BASE) {
                 if (i + 1 < size()) {
                     body_[i + 1] += body_[i] / BASE;
-                    body_[i] %= BASE;
                 } else {
                     body_.push_back(body_[i] / BASE);
-                    body_[i] %= BASE;
                 }
+                body_[i] %= BASE;
             }
             if (body_[i] < 0) {
                 body_[i + 1] -= std::abs(body_[i]) / BASE;
@@ -126,6 +112,15 @@ public:
                     body_[i + 1]--;
                 }
             }
+        }
+
+        while (size() > 1 && body_[size() - 1] == 0)
+            body_.pop_back();
+        if (size() == 0) {
+            body_.push_back(0);
+            negative_ = false;
+        } else if (size() == 1 && body_[0] == 0) {
+            negative_ = false;
         }
     }
 
@@ -220,7 +215,7 @@ public:
         std::vector<cld> second_number = convert_to_complex(other.body_, max_size);
         fft(first_number, false);
         fft(second_number, false);
-        for (int i = 0; i < static_cast<int>(first_number.size()); ++i) {
+        for (size_t i = 0; i < first_number.size(); ++i) {
             first_number[i] *= second_number[i];
         }
         reversed_fft(first_number);
@@ -251,35 +246,23 @@ public:
 
 private:
     bool more_if_equal_sign(const BigInteger& other) const {
-        if (size() == other.size()) {
-            for (int i = size() - 1; i >= 0; --i) {
-                if (body_[i] < other.body_[i])
-                    return false;
-                if (body_[i] > other.body_[i])
-                    return true;
-            }
-            return false;
+        if (size() != other.size())
+            return size() > other.size();
+
+        for (int i = size() - 1; i >= 0; --i) {
+            if (body_[i] < other.body_[i])
+                return false;
+            if (body_[i] > other.body_[i])
+                return true;
         }
-        return size() > other.size();
+        return false;
     }
 
     void plus_if_same_sign(const BigInteger& other) {
         while (other.size() > size())
             body_.push_back(0);
-        for (int i = 0; i < size(); ++i) {
-            if (i < other.size())
-                body_[i] += other.body_[i];
-        }
-        for (int i = 0; i < size(); ++i) {
-            if (body_[i] >= BASE) {
-                if (i + 1 < size()) {
-                    body_[i + 1] += body_[i] / BASE;
-                    body_[i] %= BASE;
-                } else {
-                    body_.push_back(body_[i] / BASE);
-                    body_[i] %= BASE;
-                }
-            }
+        for (int i = 0; i < size() && i < other.size(); ++i) {
+            body_[i] += other.body_[i];
         }
         normalize();
     }
@@ -291,23 +274,11 @@ private:
         }
         while (other.size() > size())
             body_.push_back(0);
-        for (int i = 0; i < size(); ++i) {
-            if (i < other.size()) {
-                if (second_more) {
-                    body_[i] += other.body_[i] - 2 * body_[i];
-                } else {
-                    body_[i] -= other.body_[i];
-                }
-            }
-        }
-        for (int i = 0; i < size(); ++i) {
-            if (body_[i] < 0) {
-                body_[i + 1] -= std::abs(body_[i]) / BASE;
-                body_[i] %= BASE;
-                if (body_[i] < 0) {
-                    body_[i] += BASE;
-                    body_[i + 1]--;
-                }
+        for (int i = 0; i < size() && i < other.size(); ++i) {
+            if (second_more) {
+                body_[i] += other.body_[i] - 2 * body_[i];
+            } else {
+                body_[i] -= other.body_[i];
             }
         }
         if (second_more)
@@ -324,12 +295,7 @@ private:
                 new_body.body_[i + j] += body_[i] * other.body_[j];
             }
         }
-        for (int i = 0; i < new_body.size() - 1; ++i) {
-            if (new_body.body_[i] >= BASE) {
-                new_body.body_[i + 1] += new_body.body_[i] / BASE;
-                new_body.body_[i] %= BASE;
-            }
-        }
+        new_body.normalize();
         new_body.negative_ = (negative_ != other.negative_);
         *this = new_body;
         normalize();
@@ -437,8 +403,7 @@ std::vector<cld> convert_to_complex(const std::vector<int>& object, int max_size
         cld w(i);
         ans.push_back(w);
     }
-    int size_a = static_cast<int>(object.size());
-    for (int i = 0; i < power_2 - size_a; ++i) {
+    for (size_t i = 0; i < power_2 - object.size(); ++i) {
         cld w(0);
         ans.push_back(w);
     }
@@ -447,7 +412,7 @@ std::vector<cld> convert_to_complex(const std::vector<int>& object, int max_size
 
 std::vector<int> convert_to_int(std::vector<cld>& object) {
     std::vector<int> ans;
-    for (auto & i : object) {
+    for (auto& i : object) {
         ans.push_back(i.real());
     }
     return ans;
@@ -472,10 +437,7 @@ void fft(std::vector<cld>& object, bool reversed_fft) {
     }
     for (int len = 2; len <= n; len *= 2) {
         for (int i = 0; i < n; i += len) {
-            ld angle = 2 * pi / len;
-            if (reversed_fft) {
-                angle *= -1;
-            }
+            ld angle = (reversed_fft ? -1 : 1) * 2 * pi / len;
             cld r = 1;
             cld w(cos(angle), sin(angle));
             for (int j = i; j < i + len / 2; ++j) {
@@ -491,9 +453,9 @@ void fft(std::vector<cld>& object, bool reversed_fft) {
 
 void reversed_fft(std::vector<cld>& object) {
     fft(object, true);
-    for (int i = 0; i < static_cast<int>(object.size()); ++i) {
+    for (size_t i = 0; i < object.size(); ++i) {
         object[i] /= object.size();
-        object[i] = floor(object[i].real() + (ld)0.5);
+        object[i] = floorl(object[i].real() + (ld)0.5);
     }
 }
 
@@ -507,8 +469,7 @@ private:
 public:
     Rational(): numerator_(0), denominator_(1) {}
 
-    Rational(const Rational& other): numerator_(other.numerator_),
-                                     denominator_(other.denominator_) {
+    Rational(const Rational& other): numerator_(other.numerator_), denominator_(other.denominator_) {
         normalize();
     }
 
@@ -541,14 +502,15 @@ public:
         if (numerator_.negative())
             new_object += '-';
         new_object += max_real.toString();
-        if (precision > 0) {
-            new_object += '.';
-            BigInteger base_number = 10;
-            for (size_t i = 0; i < precision; ++i) {
-                rest *= base_number;
-                new_object += (rest / denominator_).toString();
-                rest %= denominator_;
-            }
+        if (precision <= 0)
+            return new_object;
+
+        new_object += '.';
+        BigInteger base_number = 10;
+        for (size_t i = 0; i < precision; ++i) {
+            rest *= base_number;
+            new_object += (rest / denominator_).toString();
+            rest %= denominator_;
         }
         return new_object;
     }
@@ -562,7 +524,7 @@ public:
     }
 
     BigInteger gcd(const BigInteger& a, const BigInteger& b) {
-        return (a != 0 ? gcd(b % a, a) : b);
+        return a != 0 ? gcd(b % a, a) : b;
     }
 
     void normalize() {
@@ -587,15 +549,15 @@ public:
     }
 
     explicit operator bool() const {
-        return (*this != 0);
+        return *this != 0;
     }
 
     bool operator> (const Rational& other) const {
-        return (numerator_ * other.denominator_) > (other.numerator_ * denominator_);
+        return numerator_ * other.denominator_ > other.numerator_ * denominator_;
     }
 
     bool operator< (const Rational& other) const {
-        return (numerator_ * other.denominator_) < (other.numerator_ * denominator_);
+        return numerator_ * other.denominator_ < other.numerator_ * denominator_;
     }
 
     bool operator== (const Rational& other) const {
